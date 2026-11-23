@@ -3,7 +3,7 @@
 Scrapes DIBBS RFQs for a post date into SQLite and serves a filterable browser.
 
 ```
-py -m pip install requests beautifulsoup4 flask
+py -m pip install -r requirements.txt
 py scraper.py 11-20-2026      # scrape Friday's RFQs -> dibbs.db
 py app.py                     # http://localhost:5000
 ```
