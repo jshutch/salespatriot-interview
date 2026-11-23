@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DIBBS RFQ Browser</title>
+<style>
+  :root {
+    --navy: #1f3a60; --navy-2: #2b4f80; --bg: #f4f6f9; --line: #d5dbe3;
+    --silver: #eef1f5; --text: #1d2733; --muted: #6a7686; --red: #c00; --blue: #000099;
+    --accent: #e8a317;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: var(--text); background: var(--bg); }
+  header { background: var(--navy); color: #fff; padding: 12px 20px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  header .meta { color: #c9d5e6; }
+  header select, header button { font: inherit; padding: 4px 8px; border-radius: 4px; border: 1px solid #6c86ab; }
+  header button { background: var(--accent); border-color: var(--accent); color: #222; cursor: pointer; font-weight: 600; }
+  main { padding: 12px 20px 40px; }
+  .bar { display: flex; justify-content: space-between; align-items: center; margin: 4px 0 8px; gap: 10px; flex-wrap: wrap; }
+  .count b { font-size: 15px; }
+  .pager button { font: inherit; padding: 3px 9px; margin-left: 2px; border: 1px solid var(--line); background: #fff; border-radius: 3px; cursor: pointer; }
+  .pager button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .pager button:disabled { opacity: .4; cursor: default; }
+  .wrap { overflow-x: auto; background: #fff; border: 1px solid var(--line); border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; min-width: 1150px; }
+  thead th { background: var(--navy-2); color: #fff; text-align: left; padding: 7px 8px; font-weight: 600; white-space: nowrap; cursor: pointer; user-select: none; vertical-align: bottom; position: sticky; top: 0; }
+  thead th .arrow { opacity: .7; font-size: 10px; margin-left: 3px; }
+  thead tr.filters th { background: #e3e9f1; padding: 5px 6px; cursor: default; top: 34px; vertical-align: top; }
+  .filters input, .filters select { width: 100%; font: inherit; font-size: 12px; padding: 3px 5px; border: 1px solid #b9c4d3; border-radius: 3px; margin-bottom: 3px; background: #fff; }
+  .filters .pair { display: flex; gap: 3px; } .filters .pair input { min-width: 0; }
+  .filters label { display: flex; align-items: center; gap: 4px; font-weight: 400; color: var(--text); font-size: 12px; white-space: nowrap; }
+  .filters label input { width: auto; margin: 0; }
+  tbody td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+  tbody tr:nth-child(even) { background: var(--silver); }
+  tbody tr:hover { background: #fff6dc; }
+  td.num { text-align: right; color: var(--muted); width: 55px; }
+  a { color: #0b4fa8; text-decoration: none; } a:hover { text-decoration: underline; }
+  .tag { color: var(--red); font-size: 10px; display: block; }
+  .sub { font-size: 11px; color: var(--muted); display: block; }
+  .pill { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 9px; margin-top: 3px; margin-right: 3px; }
+  .pill.sa { background: #e2f0e5; color: #1d6b32; } .pill.un { background: #e8ecf2; color: #4a5768; }
+  .pill.fast { background: #fff0cc; color: #8a5a00; }
+  .status { color: var(--blue); font-weight: 600; }
+  .soon { color: var(--red); font-weight: 600; }
+  .empty { padding: 40px; text-align: center; color: var(--muted); }
+  mark { background: #ffe58a; padding: 0; }
+  [hidden] { display: none !important; }
+  .filters .stack > * { display: block; width: 100%; }
+  #retCustom label { margin-bottom: 3px; } #retCustom label input { flex: 1; width: auto; margin: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>DIBBS RFQ Browser</h1>
+  <span class="meta">Post date: <select id="date"></select></span>
+  <button id="clear">Clear all filters</button>
+</header>
+<main>
+  <div class="bar">
+    <div class="count" id="count"></div>
+    <div class="pager" id="pager"></div>
+  </div>
+  <div class="wrap">
+    <table>
+      <thead>
+        <tr id="heads">
+          <th data-sort="row_num">#</th>
+          <th data-sort="nsn">NSN/Part Number</th>
+          <th data-sort="nomenclature">Nomenclature</th>
+          <th data-sort="tech_docs">Technical Documents</th>
+          <th data-sort="solicitation">Solicitation</th>
+          <th data-sort="status">RFQ/Quote Status</th>
+          <th data-sort="pr_number">Purchase Request</th>
+          <th data-sort="issued">Issued</th>
+          <th data-sort="return_by">Return By</th>
+        </tr>
+        <tr class="filters">
+          <th><input data-f="row_num" placeholder="#"></th>
+          <th>
+            <input data-f="nsn" placeholder="NSN / FSC (e.g. 5340)">
+            <select data-f="item_tags"><option value="">Any item tag</option></select>
+          </th>
+          <th><input data-f="nomenclature" placeholder="Contains…"></th>
+          <th><select data-f="tech_docs"><option value="">Any</option></select></th>
+          <th>
+            <input data-f="solicitation" placeholder="Solicitation #">
+            <select data-f="set_aside"><option value="">Any set-aside</option></select>
+            <label><input type="checkbox" data-f="fast_award"> Fast award only</label>
+          </th>
+          <th><select data-f="status"><option value="">Any</option></select></th>
+          <th>
+            <input data-f="pr_number" placeholder="PR #">
+            <div class="pair"><input data-f="qty_min" type="number" placeholder="Qty ≥"><input data-f="qty_max" type="number" placeholder="Qty ≤"></div>
+          </th>
+          <th class="stack">
+            <input data-f="issued" type="date" title="Issued date">
+            <select data-f="issued_mode">
+              <option value="on">Only this date</option>
+              <option value="after">This date and later</option>
+              <option value="before">This date and earlier</option>
+              <option value="between">This date to second date</option>
+            </select>
+            <input data-f="issued_to" type="date" title="Second date" hidden>
+          </th>
+          <th>
+            <select data-f="return_within">
+              <option value="">Any</option>
+              <option value="3">Closes in ≤ 3 days</option>
+              <option value="7">Closes in ≤ 7 days</option>
+              <option value="14">Closes in ≤ 14 days</option>
+              <option value="30">Closes in ≤ 30 days</option>
+              <option value="custom">Custom range…</option>
+            </select>
+            <div id="retCustom" hidden>
+              <label>From <input data-f="return_from" type="date"></label>
+              <label>To <input data-f="return_to" type="date"></label>
+            </div>
+          </th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+<script>
+const PAGE = 50;
+let data = [], view = [], page = 1, sort = { key: "solicitation", dir: 1 };
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = iso => iso ? iso.slice(5, 7) + "-" + iso.slice(8, 10) + "-" + iso.slice(0, 4) : "";
+// local YYYY-MM-DD, N days from today (toISOString would use UTC and drift a day)
+const dayISO = (n = 0) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-CA"); };
+const norm = s => String(s ?? "").toLowerCase().replace(/[-\s]/g, "");
+
+function hl(text, q) {
+  const t = esc(text);
+  if (!q) return t;
+  const i = String(text ?? "").toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return t;
+  return esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length));
+}
+
+function filters() {
+  const f = {};
+  document.querySelectorAll("[data-f]").forEach(el => f[el.dataset.f] = el.type === "checkbox" ? el.checked : el.value.trim());
+  return f;
+}
+
+function fillSelect(key, values, label = v => v) {
+  const el = document.querySelector(`select[data-f="${key}"]`);
+  const first = el.options[0].outerHTML;
+  el.innerHTML = first + [...new Set(values.filter(Boolean))].sort()
+    .map(v => `<option value="${esc(v)}">${esc(label(v))}</option>`).join("");
+}
+
+function apply() {
+  const f = filters();
+  $("#retCustom").hidden = f.return_within !== "custom";
+  document.querySelector('[data-f="issued_to"]').hidden = f.issued_mode !== "between";
+  let issFrom = "", issTo = "";
+  if (f.issued) {
+    if (f.issued_mode === "on") issFrom = issTo = f.issued;
+    else if (f.issued_mode === "after") issFrom = f.issued;
+    else if (f.issued_mode === "before") issTo = f.issued;
+    else { issFrom = f.issued; issTo = f.issued_to; }
+  }
+  let retFrom = "", retTo = "";
+  if (f.return_within === "custom") { retFrom = f.return_from; retTo = f.return_to; }
+  else if (f.return_within) { retFrom = dayISO(0); retTo = dayISO(+f.return_within); }
+  const has = (v, q) => !q || norm(v).includes(norm(q));
+  view = data.filter(r =>
+    has(r.row_num, f.row_num) &&
+    has(r.nsn, f.nsn) &&
+    (!f.item_tags || (r.item_tags || "").includes(f.item_tags)) &&
+    (!f.nomenclature || (r.nomenclature || "").toLowerCase().includes(f.nomenclature.toLowerCase())) &&
+    (!f.tech_docs || r.tech_docs === f.tech_docs) &&
+    has(r.solicitation, f.solicitation) &&
+    (!f.set_aside || r.set_aside === f.set_aside) &&
+    (!f.fast_award || r.fast_award) &&
+    (!f.status || r.status === f.status) &&
+    has(r.pr_number, f.pr_number) &&
+    (f.qty_min === "" || (r.qty ?? -1) >= +f.qty_min) &&
+    (f.qty_max === "" || (r.qty ?? Infinity) <= +f.qty_max) &&
+    (!issFrom || r.issued >= issFrom) && (!issTo || r.issued <= issTo) &&
+    (!retFrom || r.return_by >= retFrom) && (!retTo || r.return_by <= retTo)
+  );
+  const k = sort.key;
+  view.sort((a, b) => {
+    const x = a[k] ?? "", y = b[k] ?? "";
+    return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))) * sort.dir;
+  });
+  page = Math.min(page, Math.max(1, Math.ceil(view.length / PAGE)));
+  render(f);
+}
+
+function render(f = filters()) {
+  const start = (page - 1) * PAGE, slice = view.slice(start, start + PAGE);
+  const today = dayISO(0), soon = dayISO(3);
+  $("#rows").innerHTML = slice.length ? slice.map(r => `
+    <tr>
+      <td class="num">${esc(r.row_num)}</td>
+      <td>${r.nsn_url ? `<a href="${esc(r.nsn_url)}" target="_blank" title="NSN view on DIBBS">${hl(r.nsn, f.nsn)}</a>` : hl(r.nsn, f.nsn)}
+          ${r.item_tags ? `<span class="tag">${esc(r.item_tags)}</span>` : ""}</td>
+      <td>${hl(r.nomenclature, f.nomenclature)}</td>
+      <td>${r.tech_docs_url ? `<a href="${esc(r.tech_docs_url)}" target="_blank">Tech Docs</a>` : esc(r.tech_docs)}
+          ${r.tech_docs_note ? `<span class="sub">${esc(r.tech_docs_note)}</span>` : ""}</td>
+      <td>${r.sol_pdf_url ? `<a href="${esc(r.sol_pdf_url)}" target="_blank" title="RFQ document (PDF)"><b>${hl(r.solicitation, f.solicitation)}</b></a>` : hl(r.solicitation, f.solicitation)}
+          ${r.package_url ? `<span class="sub"><a href="${esc(r.package_url)}" target="_blank" title="Open on DIBBS">Package View ↗</a></span>` : ""}
+          ${r.set_aside ? `<span class="pill ${/Unrestricted/.test(r.set_aside) ? "un" : "sa"}">${esc(r.set_aside)}</span>` : ""}
+          ${r.fast_award ? `<span class="pill fast" title="Micro-purchase quotes may be awarded prior to the return date">⚡ Fast Award</span>` : ""}</td>
+      <td><span class="status">${esc(r.status)}</span>
+          ${r.quote_url ? `<span class="sub"><a href="${esc(r.quote_url)}" target="_blank">Submit quote ↗</a></span>` : ""}</td>
+      <td>${hl(r.pr_number, f.pr_number)}${r.qty != null ? `<span class="sub">QTY: ${r.qty.toLocaleString()}</span>` : ""}</td>
+      <td>${fmt(r.issued)}</td>
+      <td class="${r.return_by && r.return_by >= today && r.return_by <= soon ? "soon" : ""}">${fmt(r.return_by)}</td>
+    </tr>`).join("") : `<tr><td colspan="9" class="empty">No RFQs match these filters.</td></tr>`;
+
+  $("#count").innerHTML = `Records Found: <b>${view.length.toLocaleString()}</b>` +
+    (view.length !== data.length ? ` <span class="sub" style="display:inline">of ${data.length.toLocaleString()}</span>` : "");
+
+  const pages = Math.max(1, Math.ceil(view.length / PAGE));
+  const lo = Math.max(1, page - 4), hi = Math.min(pages, lo + 9);
+  let h = `<button ${page === 1 ? "disabled" : ""} data-p="${page - 1}">‹</button>`;
+  for (let p = lo; p <= hi; p++) h += `<button class="${p === page ? "on" : ""}" data-p="${p}">${p}</button>`;
+  h += `<button ${page === pages ? "disabled" : ""} data-p="${page + 1}">›</button>`;
+  $("#pager").innerHTML = h;
+
+  document.querySelectorAll("#heads th").forEach(th => {
+    th.querySelector(".arrow")?.remove();
+    if (th.dataset.sort === sort.key) th.insertAdjacentHTML("beforeend", `<span class="arrow">${sort.dir > 0 ? "▲" : "▼"}</span>`);
+  });
+}
+
+async function load(date) {
+  data = await (await fetch("/api/rfqs?date=" + encodeURIComponent(date))).json();
+  fillSelect("item_tags", data.flatMap(r => (r.item_tags || "").split(", ")));
+  fillSelect("tech_docs", data.map(r => r.tech_docs));
+  fillSelect("set_aside", data.map(r => r.set_aside));
+  fillSelect("status", data.map(r => r.status));  page = 1; apply();
+}
+
+async function init() {
+  const dates = await (await fetch("/api/dates")).json();
+  if (!dates.length) { $("#rows").innerHTML = `<tr><td colspan="9" class="empty">No data yet — run <code>py scraper.py 11-20-2026</code></td></tr>`; return; }
+  $("#date").innerHTML = dates.map(d => `<option value="${d.post_date}">${fmt(d.post_date)} (${d.n})</option>`).join("");
+  $("#date").onchange = e => load(e.target.value);
+  load(dates[0].post_date);
+}
+
+document.querySelectorAll("[data-f]").forEach(el => el.addEventListener(el.tagName === "SELECT" || el.type === "checkbox" || el.type === "date" ? "change" : "input", () => { page = 1; apply(); }));
+$("#pager").onclick = e => { const p = e.target.dataset.p; if (p) { page = +p; render(); window.scrollTo(0, 0); } };
+$("#heads").onclick = e => { const th = e.target.closest("th"); if (!th) return; const k = th.dataset.sort; sort = { key: k, dir: sort.key === k ? -sort.dir : 1 }; apply(); };
+$("#clear").onclick = () => {
+  document.querySelectorAll("[data-f]").forEach(el => el.type === "checkbox" ? el.checked = false : el.value = "");
+  document.querySelector('[data-f="issued_mode"]').value = "on";  // mode has no blank option
+  page = 1; apply();
+};
+init();
+</script>
+</body>
+</html>
