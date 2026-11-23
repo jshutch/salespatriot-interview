@@ -187,7 +187,12 @@ function apply() {
     (!retFrom || r.return_by >= retFrom) && (!retTo || r.return_by <= retTo)
   );
   const k = sort.key;
+  // NSN boost: rows whose first 4 chars (the FSC) start with the first 4 typed chars sort first
+  const pre = norm(f.nsn).slice(0, 4);
+  const boost = r => pre && norm(r.nsn).slice(0, 4).startsWith(pre) ? 0 : 1;
   view.sort((a, b) => {
+    const bd = boost(a) - boost(b);
+    if (bd) return bd;
     const x = a[k] ?? "", y = b[k] ?? "";
     return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))) * sort.dir;
   });
